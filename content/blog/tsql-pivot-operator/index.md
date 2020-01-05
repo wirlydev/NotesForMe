@@ -16,7 +16,7 @@ The result should look something like...
 |----------------|----------------|----------------|------|
 |3			     |5               |0               |5     |
 
-The wrestler who won the National Championship with the most career losses will win the ficticious "Foster Resilience Award". 
+The wrestler who won the National Championship with the most career losses will win the ficticious "Annual Drew Foster Resilience Award". 
 
 ##What does the original data look like?
 
@@ -118,9 +118,21 @@ Select * from
 
 ```
 
-The big difference and the only reason we have to do this as dynamic sql is the list of names in the "For AthleteName in (..." part. Without dynamic sql we would need to manually update the query with the list of names for the competition year we are querying.
+###Source Table
 
-The subquery that populates the SourceTable provides the data the we are going to pivot so for example if we run it for 2019 we get 
+The subquery that populates the Source Table and provides the input for the pivot operator is this...
+
+```sql
+	Select 
+					a1.AthleteName,
+					Sum(a1.Losses) Losses
+				from Athletes a1 inner join 
+					Athletes a2 on (a1.AthleteName = a2.AthleteName)
+					where a2.CompetitionYear = @competitionYear and a2.NationalPlacement = @nationalPlacement
+					group by a1.AthleteName
+```
+
+So for example if we run it for 2019 we get... 
 
 |AthleteName	 |Losses|
 |----------------|------|
@@ -136,16 +148,117 @@ The subquery that populates the SourceTable provides the data the we are going t
 |Zahid Valencia	 |5     |
 
 
+###Pivot Operator
+
+Inside the pivot operator we are specifying the aggregation operator that will be populating the data rows.
+
+```sql
+Sum(Losses)
+```
+
+And the new list of values that data will be calculated for and which will be pivoted to column names.
+
+```sql
+For AthleteName in (' + @names + ')
+```
+
+Without dynamic sql we would need to manually update the query with the list of names for the competition year we are querying.
+So to determine next years Annual Drew Foster Resilience Award winner without dynamic sql we would need to manually change the @names variable with the current years national champions.
+
+###Grouping
+
+In this example there are no colums returned in the source table that are not either part of the aggregate calculation or part of the column values being pivoted to column names.
+
+If there were, then the results would be automatically grouped by thos columns as well.
+
+SO for example if the source table was changed to 
+
+```sql
+Select * from 
+				(Select
+					a2.CompetitionYear, 
+					a1.AthleteName,
+					Sum(a1.Losses) Losses
+				from Athletes a1 inner join 
+					Athletes a2 on (a1.AthleteName = a2.AthleteName)
+					where a2.CompetitionYear >= @competitionYear and a2.NationalPlacement = @nationalPlacement
+					group by a2.CompetitionYear, a1.AthleteName) as SourceTable
+				Pivot (
+					Sum(Losses) 
+					For AthleteName in ([Bo Nickal],[Jason Nolf],[Kyle Snyder ],[Michael Macchiavello],[Seth Gross],[Spencer Lee],[Vincenzo Joseph],[Yianni Diakomihalis],[Zahid Valencia],[Zain Retherford])
+					)
+				as PivotedTable
+```
+
+where we added the a2.CompetitionYear column to the source table that is passed into the pivot operator and changed the CompetitionYear comparison operator from  = to >= and ran the sproc for 2019 like shown above we get back the following results. 
+
+<div style="width: 100%; overflow-x:auto;">
+<table>
+<thead>
+<tr>
+<th>CompetitionYear</th>
+<th>Bo Nickal</th>
+<th>Jason Nolf</th>
+<th>Kyle Snyder</th>
+<th>Michael Macchiavello</th>
+<th>Seth Gross</th>
+<th>Spencer Lee</th>
+<th>Vincenzo Joseph</th>
+<th>Yianni Diakomihalis</th>
+<th>Zahid Valencia</th>
+<th>Zain Retherford</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2018</td>
+<td>5</td>
+<td>4</td>
+<td>5</td>
+<td>36</td>
+<td>21</td>
+<td>5</td>
+<td>8</td>
+<td>1</td>
+<td>5</td>
+<td>4</td>
+</tr>
+<tr>
+<td>2018</td>
+<td>5</td>
+<td>4</td>
+<td>NULL</td>
+<td>NULL</td>
+<td>NULL</td>
+<td>5</td>
+<td>NULL</td>
+<td>1</td>
+<td>5</td>
+<td>NULL</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+
+As you can see ther are a bunch of nulls where the wrestler didn't win a National Championship for that year.
+Not really useful for this example but if you see a bunch of nulls in your results make sure that you are not passing in additonal columns to the Pivot Operator. 
+
+##More Info
+
+Nothing above is new information and there are plenty of similar explanations online.
+The goal of writing this in my own words with my own example was to ingrain the concepts in my head and provide a place future me to refer to.   
+
+Below are a few additonal resources that do a good good explaining more or less the same thing.  
+
+[FROM - Using PIVOT and UNPIVOT](https://docs.microsoft.com/en-us/sql/t-sql/queries/from-using-pivot-and-unpivot?view=sql-server-ver15)
 
 
+[SQL bugs, pitfalls, and best practices – pivoting and unpivotingr](https://sqlperformance.com/2019/09/t-sql-queries/t-sql-pitfalls-pivoting-unpivoting)
 
 
-
-
-
-
-
-
+Video
+[SQL Server Programming Part 18 - Dynamic Pivot Tables](https://youtu.be/uZGjHYS9lzI)
 
 
 

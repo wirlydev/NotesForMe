@@ -49,12 +49,3 @@ create login SomeLoginName with password = 'random-string';
 exec sp_change_users_login 'Update_One', 'SomeDbUser', 'SomeLoginName';
 
 ```
-
-
-
-
-
-
-This sql will accomplish the same thing without using the sproc. 
-
-
